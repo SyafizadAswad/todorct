@@ -1,0 +1,59 @@
+Awesome! Glad to hear the compiler error is gone and everything is working smoothly.
+
+Now that it’s up and running, let’s look at the "big picture" of how these files work together. Each file has one specific job, which makes the app incredibly easy to maintain and scale.
+
+---
+
+## 🏛️ The Architecture Break Down
+
+### 1. `types.ts` (The Blueprint)
+
+* **Its Job:** It defines the **shape of your data** before any code even runs.
+* **Why it matters:** It acts as the contract for your app. By declaring exactly what a `TaskItem` is and limiting the categories strictly to `'Todo' | 'In Progress' | 'Done'`, it ensures that you can't accidentally introduce a typo later (like typing `"In-Progress"` with a hyphen or `"todo"` in lowercase), which would break your filters.
+
+### 2. `Taskboard.tsx` (The Brain / Controller)
+
+* **Its Job:** It is the **Single Source of Truth** for the app's state and data manipulation. It holds the master array of tasks (`tasks`) and contains all the CRUD logic functions (`handleAddTask`, `handleUpdateTask`, `handleDeleteTask`).
+* **Why it matters:** By keeping the state centralized here, your data flows downwards predictably. If a task moves from "Todo" to "Done", `Taskboard` updates the main array, and the whole board updates automatically. You only ever have to open *this one file* to see how your data is being created or modified.
+
+### 3. `TaskColumn.tsx` (The Organizer / Filter)
+
+* **Its Job:** It acts as a middleman container. It takes the entire master task list from the `Taskboard`, filters out *only* the tasks that match its specific column title (e.g., "Todo"), and handles the visual layout of that column.
+* **Why it matters:** It keeps the `Taskboard` from getting cluttered. Instead of the board trying to render every single task card directly, it tells `TaskColumn`, *"Here is the 'Todo' data, you figure out how to arrange it."* It also acts as a bridge, passing the CRUD functions down from the board to the cards.
+
+### 4. `Task.tsx` (The Presenter / Card)
+
+* **Its Job:** It is a **"dumb" or presentational component**. It doesn't actually know or care that a master list of tasks exists. Its only jobs are to display the data for *one single task*, handle its own tiny temporary editing state (`isEditing`), and capture user clicks.
+* **Why it matters:** It makes the UI highly reusable. When you click "Delete" or change the dropdown category on a card, the card doesn't delete or move itself—instead, it calls the `onDelete` or `onUpdate` function it received as a prop. It essentially screams up to the parent: *"Hey, the user clicked my delete button, do what you will with my ID!"*
+
+---
+
+## 🔄 How Data Flows (The Lifecycle of an Edit)
+
+To see it all working together, imagine you click **Edit** on a card and change its title:
+
+```
+[Task Component] 
+   └── User clicks "Save" 
+   └── Triggers local `handleSave()`
+   └── Fires `onUpdate(task.id, { title: editTitle })` callback
+        │
+        ▼ (Data passes up through TaskColumn to the parent)
+        │
+[Taskboard Component]
+   └── Receives the ID and new title fields via `handleUpdateTask()`
+   └── Updates the master `tasks` array state via `setTasks()`
+   └── React triggers a re-render of the entire app
+        │
+        ▼ (Fresh data flows back down)
+        │
+[TaskColumn Components] 
+   └── Re-filter the updated array
+        │
+        ▼
+[Task Component] 
+   └── Displays the brand new title!
+
+```
+
+This unidirectional data flow (Parent State ➡️ Child Props ➡️ Parent Callback) is what makes React apps robust and predictable!
