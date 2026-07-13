@@ -57,3 +57,87 @@ To see it all working together, imagine you click **Edit** on a card and change 
 ```
 
 This unidirectional data flow (Parent State ➡️ Child Props ➡️ Parent Callback) is what makes React apps robust and predictable!
+
+-------
+To understand how props work, it helps to use a simple real-world analogy.
+
+Think of a React component like a **function**, and props like the **arguments** you pass into that function. Alternatively, think of a parent component as a **manager** and a child component as an **employee**. Props are the instructions, tools, and direct lines of communication the manager gives to the employee.
+
+Here is exactly how they work and how components use them to talk to each other.
+
+---
+
+## 1. Direction: Props Only Flow Downwards (One-Way)
+
+In React, data flows in a single direction: **from parent to child**. A child component can never directly read or modify its parent's state, nor can it pass data directly to its siblings.
+
+If a child needs information, the parent must explicitly hand it over as an attribute in the JSX code.
+
+```tsx
+// The Parent (Taskboard) hands data down:
+<TaskColumn title="Todo" tasks={filteredTasks} />
+
+```
+
+Inside the child component, these attributes are collected into a single JavaScript object called `props`. In TypeScript, we use an `interface` to define exactly what keys must be inside that object:
+
+```tsx
+interface TaskColumnProps {
+  title: string;
+  tasks: TaskItem[];
+}
+
+export default function TaskColumn(props: TaskColumnProps) {
+  // Read props.title or props.tasks here
+}
+
+```
+
+---
+
+## 2. Immutability: Props Are "Read-Only"
+
+A golden rule of React is that **a child component must never alter its own props**.
+
+If a parent passes a task card a prop called `title="Learn React"`, the child cannot write `props.title = "Something Else"`. If the child tries to change it directly, React will throw an error or fail to update the screen. If data needs to change, the component that *owns* the data (the parent) has to change it.
+
+---
+
+## 3. Communication: How Children Talk Back to Parents
+
+If props only flow downwards, and props are read-only, how does a child tell a parent that something happened? (For example: how does a `Task` tell the `Taskboard` to delete it?)
+
+The answer is **Callback Functions passed down as props**.
+
+Instead of passing just raw data (strings, arrays, booleans), the parent passes down a **function**. When the child component experiences an event (like a button click), it executes that function, passing data back up as arguments.
+
+Here is exactly how that conversation looks in our code:
+
+```
+1. PARENT CREATES A LINE OF COMMUNICATION:
+   The Taskboard has a function called `handleDeleteTask(id)`.
+   It hands this function to the child like a walkie-talkie:
+   <Task onDelete={handleDeleteTask} />
+
+2. CHILD USES THE WALKIE-TALKIE:
+   Inside Task.tsx, the user clicks the delete button. 
+   The child presses the button and speaks into the walkie-talkie:
+   <button onClick={() => onDelete(task.id)}>Delete</button>
+
+3. PARENT HEARS IT AND ACTS:
+   The function triggers back up in Taskboard.tsx. 
+   The parent updates its state, and the app updates!
+
+```
+
+---
+
+## Summary of Component Communication
+
+| Communication Type | How it works | Code Example |
+| --- | --- | --- |
+| **Parent ➡️ Child** | Parent passes raw data down as a prop. | `<Task title="Buy milk"/>` |
+| **Child ➡️ Parent** | Parent passes a function down; Child executes it with arguments to send data back up. | `onAddTask(newTitle, category)` |
+| **Sibling ➡️ Sibling** | Components cannot talk sideways. They must communicate by sending data to their **common parent**, who then passes it down to the other sibling. | *Task edits category ➡️ tells Taskboard ➡️ Taskboard moves it to TaskColumn.* |
+
+This system is what keeps React applications incredibly predictable. If your app has a bug where data is changing incorrectly, you don't have to look through 50 files; you just find the one parent file that owns the state and tracks down the function altering it!
