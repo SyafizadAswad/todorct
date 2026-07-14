@@ -10,5 +10,6 @@ export interface TaskItem {
   id: number;
   title: string;
   category: Category;
-  subtask: Subtask[]; // 👈 Array of subtasks
+  subtask: Subtask[];
+  dueDate?: string; //  Add due date (stored as "YYYY-MM-DD")
 }

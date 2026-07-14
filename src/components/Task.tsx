@@ -81,6 +81,19 @@ export default function Task({
             <option value="In Progress">In Progress</option>
             <option value="Done">Done</option>
           </select>
+          <input
+            type="date"
+            value={task.dueDate || ""}
+            onChange={(e) =>
+              onUpdate(task.id, { dueDate: e.target.value || undefined })
+            }
+            style={{
+              fontSize: "11px",
+              padding: "2px",
+              border: "1px solid #ccc",
+              borderRadius: "3px",
+            }}
+          />
           <button onClick={() => setIsEditing(true)}>Edit</button>
           <button onClick={() => onDelete(task.id)} style={{ color: "red" }}>
             Delete

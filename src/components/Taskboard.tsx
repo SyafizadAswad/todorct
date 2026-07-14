@@ -3,7 +3,15 @@ import React, { useState } from "react";
 import TaskColumn from "./TaskColumn";
 import type { TaskItem, Category } from "./types";
 
-export default function Taskboard() {
+interface TaskboardProps {
+  showAddInput: boolean;
+  onTaskCreated: () => void;
+}
+
+export default function Taskboard({
+  showAddInput,
+  onTaskCreated,
+}: TaskboardProps) {
   const [tasks, setTasks] = useState<TaskItem[]>([
     {
       id: 1,
@@ -15,15 +23,38 @@ export default function Taskboard() {
     { id: 3, title: "Master lifting state up", category: "Done", subtask: [] },
   ]);
 
-  const handleAddTask = (title: string, category: Category) => {
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
+  const handleAddTask = (
+    title: string,
+    category: Category,
+    dueDate?: string,
+  ) => {
     const newTask: TaskItem = {
       id: Date.now(),
       title: title,
       category: category,
       subtask: [], // Initializes as an empty array
+      dueDate,
     };
     setTasks([...tasks, newTask]);
+    onTaskCreated();
   };
+
+  // 1. FILTER tasks by search query
+  const searchedTasks = tasks.filter((task) =>
+    task.title.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
+  // 2. SORT tasks by date (Derived State: Runs automatically on re-render!)
+  const sortedAndSearchedTasks = [...searchedTasks].sort((a, b) => {
+    if (a.dueDate && b.dueDate) {
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime(); // Closest date first
+    }
+    if (a.dueDate) return -1; // Keep tasks with dates on top
+    if (b.dueDate) return 1;
+    return 0; // Both have no date
+  });
 
   const handleUpdateTask = (id: number, updatedFields: Partial<TaskItem>) => {
     setTasks(
@@ -88,35 +119,41 @@ export default function Taskboard() {
 
   return (
     <div style={{ padding: "20px", fontFamily: "sans-serif" }}>
-      <h2>Team Taskboard with Subtasks</h2>
-
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginTop: "20px",
-        }}
-      >
-        {categories.map((category) => {
-          const filteredTasks = tasks.filter((t) => t.category === category);
-
-          return (
-            <TaskColumn
-              key={category}
-              title={category}
-              tasks={filteredTasks}
-              onUpdateTask={handleUpdateTask}
-              onDeleteTask={handleDeleteTask}
-              onAddTask={handleAddTask}
-              // 👇 Pushing handlers down the branch
-              onAddSubtask={handleAddSubtask}
-              onUpdateSubtask={handleUpdateSubtask}
-              onDeleteSubtask={handleDeleteSubtask}
-            />
-          );
-        })}
+      {/* Search Input Markup */}
+      <div style={{ marginBottom: "20px" }}>
+        <input
+          type="text"
+          placeholder="🔍 Search tasks..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{
+            padding: "8px 12px",
+            width: "300px",
+            borderRadius: "4px",
+            border: "1px solid #ccc",
+          }}
+        />
       </div>
+      {categories.map((category) => {
+        const filteredTasks = sortedAndSearchedTasks.filter(
+          (t) => t.category === category,
+        );
+
+        return (
+          <TaskColumn
+            key={category}
+            title={category}
+            tasks={filteredTasks}
+            onUpdateTask={handleUpdateTask}
+            onDeleteTask={handleDeleteTask}
+            onAddTask={handleAddTask}
+            onAddSubtask={handleAddSubtask}
+            onUpdateSubtask={handleUpdateSubtask}
+            onDeleteSubtask={handleDeleteSubtask}
+            showAddInput={showAddInput}
+          />
+        );
+      })}
     </div>
   );
 }

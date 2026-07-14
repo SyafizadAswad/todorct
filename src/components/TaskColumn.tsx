@@ -1,5 +1,5 @@
 // TaskColumn.tsx
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Task from "./Task";
 import type { TaskItem, Category } from "./types";
 
@@ -8,11 +8,11 @@ interface TaskColumnProps {
   tasks: TaskItem[];
   onUpdateTask: (id: number, updatedFields: Partial<TaskItem>) => void;
   onDeleteTask: (id: number) => void;
-  onAddTask: (title: string, category: Category) => void;
-  // 👇 Accepting the subtask handlers
+  onAddTask: (title: string, category: Category, dueDate?: string) => void;
   onAddSubtask: (taskId: number, title: string) => void;
   onUpdateSubtask: (taskId: number, subtaskId: number, title: string) => void;
   onDeleteSubtask: (taskId: number, subtaskId: number) => void;
+  showAddInput: boolean;
 }
 
 export default function TaskColumn({
@@ -24,9 +24,10 @@ export default function TaskColumn({
   onAddSubtask,
   onUpdateSubtask,
   onDeleteSubtask,
+  showAddInput,
 }: TaskColumnProps) {
-  // ... (keep the same local handleSubmit logic from before)
   const [newTitle, setNewTitle] = React.useState<string>("");
+  const [newDate, setNewDate] = useState<string>("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,11 +65,11 @@ export default function TaskColumn({
         ))}
       </div>
 
-      {title === "Todo" && (
+      {title === "Todo" && showAddInput && (
         <form onSubmit={handleSubmit} style={{ marginTop: "15px" }}>
           <input
             type="text"
-            placeholder="+ Add a task..."
+            placeholder="Add new task..."
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             style={{
@@ -76,6 +77,18 @@ export default function TaskColumn({
               padding: "6px",
               boxSizing: "border-box",
               marginBottom: "5px",
+            }}
+            autoFocus // Automatically focuses when it appears on screen!
+          />
+          <input
+            type="date"
+            value={newDate}
+            onChange={(e) => setNewDate(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "4px",
+              boxSizing: "border-box",
+              fontSize: "12px",
             }}
           />
           <button type="submit" style={{ width: "100%" }}>
