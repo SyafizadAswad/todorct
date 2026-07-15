@@ -1,0 +1,241 @@
+To implement a global sorting feature, we will use the exact same strategy we just used for the `isAdding` state.
+
+Because `Navbar` and `Taskboard` are siblings, they cannot talk to each other directly. We must **lift the sorting state up** to `App.tsx` (their parent):
+
+1. **`App.tsx`** will hold the state of the current sorting direction (`'asc'` or `'desc'`).
+2. **`Navbar.tsx`** will display the dropdown. When a user selects a different option, it calls a function in `App.tsx` to update the state.
+3. **`App.tsx`** passes the sorting value down to **`Taskboard.tsx`**.
+4. **`Taskboard.tsx`** uses this value on the fly to sort the tasks before they are drawn on screen.
+
+Let's implement this! It only takes a few minor updates.
+
+---
+
+### 1. Update `types.ts`
+
+Let's add a quick custom type for our sorting directions so TypeScript can keep us safe.
+
+```typescript
+// types.ts
+export type Category = 'Todo' | 'In Progress' | 'Done';
+export type SortDirection = 'asc' | 'desc'; // 👈 New type
+
+export interface Subtask {
+  id: string;
+  title: string;
+}
+
+export interface TaskItem {
+  id: string;
+  title: string;
+  category: Category;
+  subtask: Subtask[];
+  dueDate?: string; 
+}
+
+```
+
+---
+
+### 2. Update `Navbar.tsx` (Add the Dropdown)
+
+We'll add a simple HTML `<select>` dropdown to the navbar. When the user changes it, it fires our parent callback.
+
+```tsx
+// Navbar.tsx
+import React from 'react';
+import type { SortDirection } from './types';
+
+interface NavbarProps {
+  onAddTaskClick: () => void;
+  sortDirection: SortDirection; // 👈 Current sort state
+  onSortChange: (direction: SortDirection) => void; // 👈 State setter callback
+}
+
+export default function Navbar({ onAddTaskClick, sortDirection, onSortChange }: NavbarProps) {
+  return (
+    <nav style={{ 
+      padding: '15px 20px', 
+      backgroundColor: '#282c34', 
+      color: 'white', 
+      display: 'flex', 
+      justifyContent: 'space-between', 
+      alignItems: 'center',
+      fontFamily: 'sans-serif'
+    }}>
+      <h1 style={{ margin: 0, fontSize: '20px' }}>📋 Workspace Board</h1>
+      
+      <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+        {/* 👇 Sorting Dropdown */}
+        <label style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+          Sort by Date:
+          <select 
+            value={sortDirection} 
+            onChange={(e) => onSortChange(e.target.value as SortDirection)}
+            style={{ padding: '4px 8px', borderRadius: '4px', border: 'none', cursor: 'pointer' }}
+          >
+            <option value="asc">Earliest First (Ascending)</option>
+            <option value="desc">Latest First (Descending)</option>
+          </select>
+        </label>
+
+        <button 
+          onClick={onAddTaskClick} 
+          style={{ 
+            padding: '8px 16px', 
+            backgroundColor: '#61dafb', 
+            color: '#282c34', 
+            border: 'none', 
+            borderRadius: '4px', 
+            fontWeight: 'bold', 
+            cursor: 'pointer',
+            fontSize: '14px'
+          }}
+        >
+          + Add Task
+        </button>
+      </div>
+    </nav>
+  );
+}
+
+```
+
+---
+
+### 3. Update `App.tsx` (The Shared State Parent)
+
+We initialize the state `sortDirection` here and pass both the value and the change handler down to our two sibling components.
+
+```tsx
+// App.tsx
+import React, { useState } from 'react';
+import Navbar from './components/Navbar';
+import Taskboard from './components/Taskboard';
+import type { SortDirection } from './components/types';
+
+function App() {
+  const [isAdding, setIsAdding] = useState<boolean>(false);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc'); // 👈 Shareable state
+
+  return (
+    <div>
+      {/* 1. Navbar sets the sorting state */}
+      <Navbar 
+        onAddTaskClick={() => setIsAdding(true)} 
+        sortDirection={sortDirection}
+        onSortChange={setSortDirection}
+      />
+      
+      {/* 2. Taskboard receives the sorting state */}
+      <Taskboard 
+        showAddInput={isAdding} 
+        onTaskCreated={() => setIsAdding(false)} 
+        sortDirection={sortDirection} 
+      />
+    </div>
+  );
+}
+
+export default App;
+
+```
+
+---
+
+### 4. Update `Taskboard.tsx` (Sorting Logic)
+
+Now, we update our dynamic `sort` algorithm to look at `sortDirection` when sorting the tasks before rendering them.
+
+```tsx
+// Taskboard.tsx
+import React, { useState } from 'react';
+import TaskColumn from './TaskColumn';
+import type { TaskItem, Category, SortDirection } from './types';
+
+interface TaskboardProps {
+  showAddInput: boolean;
+  onTaskCreated: () => void;
+  sortDirection: SortDirection; // 👈 Receive sorting direction from parent
+}
+
+export default function Taskboard({ showAddInput, onTaskCreated, sortDirection }: TaskboardProps) {
+  const [tasks, setTasks] = useState<TaskItem[]>([
+    { id: '1', title: 'Learn React State', category: 'Todo', dueDate: '2026-07-20', subtask: [] },
+    { id: '2', title: 'Build Todo App', category: 'In Progress', dueDate: '2026-07-15', subtask: [] },
+    { id: '3', title: 'Master lifting state up', category: 'Done', subtask: [] }
+  ]);
+  
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // ... (keep handleAddTask, handleUpdateTask, etc. exactly the same) ...
+
+  const categories: Category[] = ['Todo', 'In Progress', 'Done'];
+
+  // 1. FILTER by Search
+  const searchedTasks = tasks.filter(task => 
+    task.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // 2. SORT dynamically based on sortDirection (Derived State)
+  const sortedAndSearchedTasks = [...searchedTasks].sort((a, b) => {
+    if (a.dueDate && b.dueDate) {
+      const timeA = new Date(a.dueDate).getTime();
+      const timeB = new Date(b.dueDate).getTime();
+      
+      // Toggle sort math based on asc vs desc
+      return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
+    }
+    
+    // Always push tasks without dates to the very bottom
+    if (a.dueDate) return -1; 
+    if (b.dueDate) return 1;
+    return 0;
+  });
+
+  return (
+    <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
+      {/* Search Input */}
+      <div style={{ marginBottom: '20px' }}>
+        <input 
+          type="text" 
+          placeholder="🔍 Search tasks..." 
+          value={searchQuery} 
+          onChange={(e) => setSearchQuery(e.target.value)} 
+          style={{ padding: '8px 12px', width: '300px', borderRadius: '4px', border: '1px solid #ccc' }}
+        />
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        {categories.map(category => {
+          const filteredTasks = sortedAndSearchedTasks.filter(t => t.category === category);
+          
+          return (
+            <TaskColumn 
+              key={category}
+              title={category}
+              tasks={filteredTasks}
+              onUpdateTask={handleUpdateTask}
+              onDeleteTask={handleDeleteTask}
+              onAddTask={handleAddTask}
+              onAddSubtask={handleAddSubtask}
+              onUpdateSubtask={handleUpdateSubtask}
+              onDeleteSubtask={handleDeleteSubtask}
+              showAddInput={showAddInput} 
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+```
+
+---
+
+## 💡 What Makes This Solution So Clean?
+
+By relying on **derived state** (calculating the sort on-the-fly inside the render process rather than storing a separate `sortedTasks` array in React's memory), you get maximum performance with zero sync issues.
+
+When you change the dropdown option in the `Navbar`, `App.tsx` updates its state, triggering a re-render. `Taskboard` receives the new `sortDirection` and immediately reshuffles the array—your list reorganizes instantly!
