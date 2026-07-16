@@ -1,0 +1,157 @@
+To make the `Navbar` perfectly match the width of the `Taskboard` dynamically (without hardcoding any pixel widths), we want to leverage the browser's native **CSS layout engine**.
+
+Since both components are likely stacked inside a common container (like your main `App.tsx` file), the cleanest, industry-standard approach is to **wrap them in a shared container** and let CSS flexbox or layout alignment dictate their widths.
+
+Here are the two simplest ways to do this, ranging from pure CSS to automatic alignment.
+
+---
+
+## Method 1: The Shared Wrapper (Simplest & Recommended)
+
+The most robust way to ensure a header/navbar matches the exact width of its content board is to wrap both components in a wrapper `div` that controls the width, and let both components stretch to fill $100\%$ of that wrapper.
+
+### Step 1: Wrap them in `App.tsx`
+
+Give your parent container a maximum width, center it on the screen, and let the children take up the full available space.
+
+```tsx
+// App.tsx
+import React, { useState } from 'react';
+import Navbar from './components/Navbar';
+import Taskboard from './components/Taskboard';
+
+function App() {
+  const [isAdding, setIsAdding] = useState<boolean>(false);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  return (
+    // This wrapper acts as the master boundary for both components
+    <div style={{ 
+      maxWidth: '1200px', // The max size you want your layout to grow
+      margin: '0 auto',   // Centers the entire app on the screen
+      padding: '0 20px',  // Prevents the layout from hugging the screen edges
+      boxSizing: 'border-box'
+    }}>
+      {/* Both children will now naturally stretch to exactly match this 1200px container */}
+      <Navbar 
+        onAddTaskClick={() => setIsAdding(true)} 
+        sortDirection={sortDirection}
+        onSortChange={setSortDirection}
+      />
+      <Taskboard 
+        showAddInput={isAdding} 
+        onTaskCreated={() => setIsAdding(false)} 
+        sortDirection={sortDirection} 
+      />
+    </div>
+  );
+}
+
+export default App;
+
+```
+
+### Step 2: Set the Components to $100\%$ Width
+
+In both `Navbar.tsx` and `Taskboard.tsx`, make sure their root elements do **not** have hardcoded widths, and that they expand to fill their parent container:
+
+```tsx
+// In Navbar.tsx styles:
+<nav style={{ 
+  width: '100%', 
+  boxSizing: 'border-box' 
+  // ... rest of your styling
+}}>
+
+```
+
+```tsx
+// In Taskboard.tsx styles:
+<div style={{ 
+  width: '100%', 
+  boxSizing: 'border-box' 
+  // ... rest of your styling
+}}>
+
+```
+
+---
+
+## Method 2: "Fit-Content" (If your Taskboard defines its own size)
+
+If your `Taskboard` width is dynamic (for example, it expands horizontally based on the number of columns), you can force the master container in `App.tsx` to shrink-wrap perfectly around the size of the board using `width: fit-content`.
+
+This forces the parent container to calculate the size of the widest child (`Taskboard`) and then forces the other child (`Navbar`) to match that exact width.
+
+### Update `App.tsx`
+
+```tsx
+// App.tsx
+function App() {
+  return (
+    <div style={{ 
+      width: 'fit-content', // 👈 Shrink-wraps the app to the exact width of the columns
+      margin: '0 auto',     // Centers it on the page
+      display: 'flex', 
+      flexDirection: 'column',
+      gap: '20px'
+    }}>
+      <Navbar ... />
+      <Taskboard ... />
+    </div>
+  );
+}
+
+```
+
+By telling the parent to become a flex column with a width of `fit-content`, the browser calculates the layout size of the `Taskboard` (which is naturally wide because of the 3 side-by-side columns) and expands the `Navbar` to match that layout limit exactly.
+
+---
+
+## 🎨 Quick Styling Correction for your Navbar Items
+
+You mentioned wanting an item styled as `margin-left: auto` to be on the utmost right of the navbar.
+
+Using **Flexbox** makes aligning items like this exceptionally clean. Here is how your `Navbar.tsx` JSX structure should look to support this:
+
+```tsx
+// Navbar.tsx
+export default function Navbar({ onAddTaskClick, sortDirection, onSortChange }: NavbarProps) {
+  return (
+    <nav style={{ 
+      display: 'flex', 
+      alignItems: 'center', 
+      width: '100%',
+      padding: '15px 20px', 
+      backgroundColor: '#282c34', 
+      boxSizing: 'border-box'
+    }}>
+      {/* 1. Left item (Branding) */}
+      <h1 style={{ margin: 0, color: 'white', fontSize: '20px' }}>📋 Workspace Board</h1>
+
+      {/* 2. Right items container (pushes itself and everything inside to the far right) */}
+      <div style={{ 
+        marginLeft: 'auto', // 👈 Pushes this entire block to the right edge
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '15px' 
+      }}>
+        <label style={{ color: 'white', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+          Sort by Date:
+          <select value={sortDirection} onChange={(e) => onSortChange(e.target.value as any)}>
+            <option value="asc">Earliest First</option>
+            <option value="desc">Latest First</option>
+          </select>
+        </label>
+
+        <button onClick={onAddTaskClick}>+ Add Task</button>
+      </div>
+    </nav>
+  );
+}
+
+```
+
+### Why this Flexbox approach is great:
+
+Instead of putting `margin-left: auto` on a single button, putting it on a **wrapper container** that houses both your *sorting dropdown* and *add task button* ensures that your entire functional control suite is grouped together and pushed cleanly to the far right, while your branding stays firmly on the left!
