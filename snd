@@ -1,126 +1,51 @@
-It is actually **not hard at all**! You don't need heavy third-party libraries like `react-beautiful-dnd` or `@dnd-kit` for a simple demo app. Modern web browsers have a highly capable, native **HTML5 Drag and Drop API** built right in.
+// App.test.tsx
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, it, expect, vi } from 'vitest'
+import App from './App'
 
-By using simple event attributes (`draggable`, `onDragStart`, `onDragOver`, and `onDrop`), we can get drag-and-drop working with just a few lines of code.
+// Optional: Mock CSS or complex child components if they break test environment
+vi.mock('./Taskboard.css', () => ({}))
 
-Here is the straightforward way to implement this native feature across your components.
+describe('App Search Integration Flow', () => {
+  it('filters task columns when user types into the navbar search input', async () => {
+    // 1. Setup userEvent for realistic user interactions (typing, clicking)
+    const user = userEvent.setup()
 
----
+    // 2. Render the top-level parent component
+    render(<App />)
 
-## 🏗️ How Native Drag and Drop Works in React
+    // 3. Verify initial state: both tasks are visible in TaskColumn
+    expect(screen.getByText('Fix Authentication Bug')).toBeInTheDocument()
+    expect(screen.getByText('Design Landing Page')).toBeInTheDocument()
 
-We only need three tiny pieces of logic:
+    // 4. Locate the search input in Navbar
+    const searchInput = screen.getByPlaceholderText(/search tasks/i)
 
-1. **The Card (`Task.tsx`):** We make it `draggable` and tell it to store its `id` in the browser's drag-and-drop clipboard when dragging starts.
-2. **The Column (`TaskColumn.tsx`):** We make it act as a "drop zone." It intercepts when a card is dragged over it and captures the drop event.
-3. **The Parent (`Taskboard.tsx`):** When the drop event finishes, it reads the card's `id` and the column's target `category`, then updates the state array using our existing `handleUpdateTask` function!
+    // 5. User types "Fix" into the search bar
+    await user.type(searchInput, 'Fix')
 
----
+    // 6. Assert that state flowed through App down to TaskColumn:
+    // "Fix Authentication Bug" remains, "Design Landing Page" disappears
+    expect(screen.getByText('Fix Authentication Bug')).toBeInTheDocument()
+    expect(screen.queryByText('Design Landing Page')).not.toBeInTheDocument()
+  })
 
-### 1. Make the Cards Draggable (`Task.tsx`)
+  it('clears filter and shows all tasks when search input is emptied', async () => {
+    const user = userEvent.setup()
+    render(<App />)
 
-Add the standard HTML `draggable` property and an `onDragStart` handler to your card container.
+    const searchInput = screen.getByPlaceholderText(/search tasks/i)
 
-```tsx
-// Task.tsx (Partial)
-export default function Task({ task, onUpdate, onDelete, ...subtaskProps }: TaskProps) {
-  // ... Keep all state and handlers the same ...
+    // Filter down to one item
+    await user.type(searchInput, 'Fix')
+    expect(screen.queryByText('Design Landing Page')).not.toBeInTheDocument()
 
-  // Store the task ID in the drag event clipboard
-  const handleDragStart = (e: React.DragEvent) => {
-    e.dataTransfer.setData('text/plain', task.id);
-  };
+    // Clear the input
+    await user.clear(searchInput)
 
-  return (
-    <div 
-      draggable // 👈 1. Make it draggable
-      onDragStart={handleDragStart} // 👈 2. Set the clipboard data
-      style={{ 
-        padding: '15px', 
-        margin: '10px 0', 
-        backgroundColor: '#fff', 
-        border: '1px solid #ccc', 
-        borderRadius: '4px',
-        cursor: 'grab' // 👈 Nice UX: changes cursor to a hand
-      }}
-    >
-      {/* ... Rest of your Task JSX remains exactly the same ... */}
-    </div>
-  );
-}
-
-```
-
----
-
-### 2. Turn the Columns into Drop Zones (`TaskColumn.tsx`)
-
-We need to listen to two drag events on the column container:
-
-* `onDragOver`: By default, browsers prevent dropping items. We must call `e.preventDefault()` here to signal to the browser: *"Yes, we are allowed to drop things here."*
-* `onDrop`: Captures the dropped card's ID from the clipboard and forwards it to the parent to move columns.
-
-```tsx
-// TaskColumn.tsx (Partial)
-interface TaskColumnProps {
-  // ... Keep existing props ...
-  onUpdateTask: (id: string, updatedFields: Partial<TaskItem>) => void; // Used to update category
-}
-
-export default function TaskColumn({ title, tasks, onUpdateTask, ...rest }: TaskColumnProps) {
-  // ... Keep existing local states ...
-
-  // Allow drop behavior
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  // Handle the actual dropped item
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const taskId = e.dataTransfer.getData('text/plain'); // Retrieve the task's ID
-    if (taskId) {
-      // 👈 Update the task's category directly using our existing update callback!
-      onUpdateTask(taskId, { category: title }); 
-    }
-  };
-
-  return (
-    <div 
-      onDragOver={handleDragOver} // 👈 1. Enable dropping
-      onDrop={handleDrop}         // 👈 2. Listen for drop
-      style={{ 
-        flex: 1, 
-        margin: '0 10px', 
-        padding: '10px', 
-        backgroundColor: '#f4f4f4', 
-        borderRadius: '8px', 
-        minWidth: '250px',
-        minHeight: '400px' // 👈 Crucial: gives you space to drop cards into empty columns!
-      }}
-    >
-      <h3>{title} ({tasks.length})</h3>
-      
-      <div>
-        {tasks.map(task => (
-          <Task key={task.id} task={task} onUpdate={onUpdateTask} {...rest} />
-        ))}
-      </div>
-      
-      {/* ... Keep form conditional rendering ... */}
-    </div>
-  );
-}
-
-```
-
----
-
-## 🎉 That is literally it!
-
-No updates to `Taskboard.tsx` are required. Because `onUpdateTask` (which uses our original `handleUpdateTask` function) is already perfectly set up to find a task by its ID and change any field on it, passing `{ category: title }` shifts the card instantly.
-
-### Why this works so effortlessly
-
-The beauty of this native approach lies in the browser's built-in clipboard system (`e.dataTransfer`). By storing the card's simple `id` string when the drag begins, we can grab it out in any column drop event.
-
-Once the category is updated, React re-renders, the sorting/filter functions on your `Taskboard` run, and the card naturally shifts from one column to another!
+    // Both items should be back
+    expect(screen.getByText('Fix Authentication Bug')).toBeInTheDocument()
+    expect(screen.getByText('Design Landing Page')).toBeInTheDocument()
+  })
+})
